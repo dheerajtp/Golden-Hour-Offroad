@@ -22,12 +22,14 @@ together, then pull up to a start gate for an instant 3-2-1 race to the finish.
 - **Opt-in races** — drive into a marked start gate with a friend,
   3-2-1 countdown, first to the finish wins
 - **On foot** — exit the truck, walk/sit/lie, rest at cabins & campsites
-  (jumps time to dawn)
+  (jumps time to early morning)
 - **World life** — ambient AI trucks, deer & rabbits, cabins, campsites,
   windmill, barn, ruins, lighthouse, bridges, rock tunnel
-- **Atmosphere** — clouds, birds, mist, fireflies, rain & rainbow, autumn
-  leaves, chimney smoke, butterflies, shooting stars, moon (most toggleable
-  in `src/config.js`)
+- **Atmosphere** — clouds, birds, mist, shooting stars, moon, rain & rainbow,
+  autumn leaves, chimney smoke, fireflies, butterflies. All toggleable via
+  `CONFIG.atmosphere` in `src/config.js` (currently on: clouds, birds,
+  morning fog, moon, shooting stars, rainbow; currently off: rain, mist,
+  fireflies, leaves, smoke, butterflies)
 - **Mobile** — touch controls auto-enable on coarse pointers (or `?touch=1`)
 
 ## Quick start (local)
@@ -47,18 +49,18 @@ Any static file server works, e.g. `npx serve .`.
 
 | Key | Action |
 |---|---|
-| `W` / `S` | Gas / brake-reverse |
-| `A` / `D` | Steer |
+| `W` / `↑` | Gas |
+| `S` / `↓` | Brake / reverse |
+| `A` `D` / `←` `→` | Steer |
 | `F` | Exit truck / get in / sit → lie → stand |
 | `1` / `2` / `3` | Switch trucks |
 | `T` (hold) | 25× time fast-forward |
 | `L` | Headlights: auto → forced → auto |
-| `E` | Rest at a cabin/camp at night (jump to dawn) |
+| `E` | Rest at a cabin/camp at night (jump to early morning) |
 | `M` | Session panel (multiplayer code) |
-| `↑` / `↓` | Adjust engine volume (when focused outside inputs) |
 
-Mobile shows on-screen gas/steer/brake plus truck, lights, fast, and menu
-buttons.
+Mobile shows on-screen gas/steer/brake plus truck, enter/exit (`F`),
+lights, fast, and menu buttons.
 
 ### Multiplayer
 
@@ -120,7 +122,7 @@ Open it and you're driving. Every push to `main` redeploys automatically.
 
 ### Verify the deployment
 
-- Page loads to the golden-hour loading screen and then renders the world.
+- Page shows the loading screen, then renders the world.
 - `M` opens the session panel and hosting generates a code.
 - A friend on another machine can join with the code (both need internet
   for signaling).
