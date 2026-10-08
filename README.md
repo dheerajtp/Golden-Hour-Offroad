@@ -14,15 +14,18 @@ together, then pull up to a start gate for an instant 3-2-1 race to the finish.
   stream & ford, gorge, beach, desert mesa, and landmark regions, all fading
   into fog
 - **Full day/night cycle** — dawn → golden hour (default spawn) → dusk →
-  night with moonlight and lit cabin windows → dawn, looping
+  night with moonlight and lit cabin windows → dawn, looping (60-minute
+  cycle; time slows to a crawl while you're parked or sitting/lying)
 - **3 trucks** — era-distinct 60s/70s/80s 4x4s (all unlocked), arcade
   physics with suspension bounce
 - **Multiplayer** — free P2P (WebRTC via PeerJS), host-authoritative,
   share a 4-char code to join each other's world
 - **Opt-in races** — drive into a marked start gate with a friend,
-  3-2-1 countdown, first to the finish wins
-- **On foot** — exit the truck, walk/sit/lie, rest at cabins & campsites
-  (jumps time to early morning)
+  3-2-1 countdown, first to the finish wins *(currently disabled for a
+  stress-free session — set `RACE.enabled = true` in `src/config.js` to
+  restore)*
+- **On foot** — exit the truck, sit or lie down anywhere, rest at cabins &
+  campsites (jumps time to early morning)
 - **World life** — ambient AI trucks, deer & rabbits, cabins, campsites,
   windmill, barn, ruins, lighthouse, bridges, rock tunnel
 - **Atmosphere** — clouds, birds, mist, shooting stars, moon, rain & rainbow,

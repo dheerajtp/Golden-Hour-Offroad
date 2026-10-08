@@ -44,8 +44,9 @@ export const WATER = {
 };
 
 export const TIME = {
-  dayLengthSec: 1200,
+  dayLengthSec: 3600,
   startPhase: 0.74,
+  stillScale: 0.25, // time slows to this when parked in the truck or sitting/lying
 };
 
 export const LIGHT_GAIN = 3.5;
@@ -53,8 +54,8 @@ export const LIGHT_GAIN = 3.5;
 export const CONFIG = {
   quality: 'high',
   atmosphere: {
-    clouds: true, birds: true, mist: false, morningFog: true,
-    moon: true, shootingStars: true, fireflies: false,
+    clouds: true, birds: true, mist: true, morningFog: true,
+    moon: true, shootingStars: true, fireflies: true,
     rain: false, rainbow: true, leaves: false, smoke: false, butterflies: false,
   },
 };
@@ -75,6 +76,10 @@ export const REST = {
   fadeMs: 550,
 };
 
+export const RACE = {
+  enabled: false, // stress-free: gates stay as scenery, no countdown ever
+};
+
 export const AUDIO = {
   master: 0.6,
   wind: 0.5, nature: 0.45, engine: 0.45, water: 0.5, fire: 0.45, ui: 0.4,
@@ -82,7 +87,7 @@ export const AUDIO = {
 };
 
 export const ANIMALS = {
-  fleeDist: 12,
+  fleeDist: 0, // stress-free: animals never flee
   fleeFar: 40,
   nightDist: 15,
   nightOn: 0.7,

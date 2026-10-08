@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PALETTE, WORLD } from '../config.js';
+import { PALETTE, WORLD, RACE } from '../config.js';
 import { loadCar } from '../vehicle/assets.js';
 
 const START_RADIUS = 7;
@@ -101,6 +101,7 @@ export class RaceZone {
   }
 
   update(dt, actors, canTrigger) {
+    if (!RACE.enabled) return;
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.goFlash = Math.max(0, this.goFlash - dt);
 

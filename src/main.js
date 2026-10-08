@@ -334,7 +334,7 @@ async function boot() {
         }
         return;
       }
-      if (nearFire() && sky.nightFactor > REST.nightMin) walker.pose = 'sit';
+      walker.pose = 'sit'; // sit anywhere
     } else if (walker.pose === 'sit') {
       walker.pose = 'lie';
     } else {
@@ -392,7 +392,10 @@ async function boot() {
       const d = ((timeTarget - timeOfDay + 1.5) % 1) - 0.5;
       timeOfDay = (timeOfDay + d * (1 - Math.exp(-4 * rawDt)) + 1) % 1;
     } else {
-      timeOfDay = (timeOfDay + (rawDt * timeScale) / TIME.dayLengthSec) % 1;
+      const still = (foot && walker.pose !== 'stand')
+        || (!foot && Math.abs(driver.speed) < FOOT.exitMaxSpeed);
+      timeOfDay = (timeOfDay
+        + (rawDt * timeScale * (still ? TIME.stillScale : 1)) / TIME.dayLengthSec) % 1;
     }
 
     sky.update(timeOfDay, playerPos());
@@ -508,8 +511,9 @@ async function boot() {
             ? (touch.isTouch ? `Tap to ${verb} · F — sit` : `E — ${verb} until morning · F — sit by the fire`)
             : (touch.isTouch ? `Tap to ${verb} until morning` : `E — ${verb} until morning`);
           nextKind = 'rest';
-        } else if (nearFire() && sky.nightFactor > REST.nightMin) {
-          nextHint = 'F — sit by the fire';
+        } else {
+          nextHint = (nearFire() && sky.nightFactor > REST.nightMin)
+            ? 'F — sit by the fire' : 'F — sit';
           nextKind = 'f';
         }
       }
