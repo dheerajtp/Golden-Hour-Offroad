@@ -91,10 +91,18 @@ export function buildGarage(terrain, garageList) {
   place(box(0.28, 2.6, 8.4, wood), 9.25, 1.3, -0.1);
   place(box(1.4, 0.16, 0.5, PALETTE.sun, true), 0, 4.1, 3.9);
 
+  const COLS = 4;
+  const COL_GAP = 4.4;
+  const rowCount = Math.ceil(garageList.length / COLS);
+  const rowZ = rowCount === 1 ? [0.5] : [2.1, -2.1];
   const slots = garageList.map((g, i) => {
-    const lx = (i - 1) * 5.6;
-    place(box(5.2, 0.14, 6.8, PALETTE.rock), lx, 0.07, 0.5);
-    const w = localToWorld(cx, cz, yaw, lx, 0.5);
+    const row = Math.floor(i / COLS);
+    const col = i % COLS;
+    const inRow = Math.min(garageList.length - row * COLS, COLS);
+    const lx = (col - (inRow - 1) / 2) * COL_GAP;
+    const lz = rowZ[Math.min(row, rowZ.length - 1)];
+    place(box(4.0, 0.14, 4.0, PALETTE.rock), lx, 0.07, lz);
+    const w = localToWorld(cx, cz, yaw, lx, lz);
     return { id: g.id, index: i, x: w.x, y: terrain.heightAt(w.x, w.z), z: w.z, yaw };
   });
 

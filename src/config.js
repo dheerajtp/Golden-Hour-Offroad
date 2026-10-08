@@ -224,6 +224,66 @@ export const GARAGE = [
       drag: 0.5, engineBrake: 3.0, steerRate: 1.5,
     },
   },
+  {
+    id: 'courier',
+    era: '1970s',
+    name: 'Parcel Courier',
+    model: 'delivery.glb',
+    rack: false,
+    cargo: false,
+    handling: {
+      maxSpeed: 14, accel: 5.6, brake: 12, reverseAccel: 4.2,
+      drag: 0.65, engineBrake: 3.6, steerRate: 1.55,
+    },
+  },
+  {
+    id: 'grand',
+    era: '1990s',
+    name: 'Summit Grand',
+    model: 'suv-luxury.glb',
+    rack: true,
+    cargo: false,
+    handling: {
+      maxSpeed: 17.5, accel: 7.4, brake: 13.5, reverseAccel: 5,
+      drag: 0.5, engineBrake: 3.1, steerRate: 1.7,
+    },
+  },
+  {
+    id: 'valley',
+    era: '1960s',
+    name: 'Valley Sedan',
+    model: 'sedan.glb',
+    rack: false,
+    cargo: false,
+    handling: {
+      maxSpeed: 16, accel: 6.9, brake: 13.5, reverseAccel: 4.8,
+      drag: 0.52, engineBrake: 3.3, steerRate: 1.8,
+    },
+  },
+  {
+    id: 'sprint',
+    era: '1990s',
+    name: 'Sunset Sprint',
+    model: 'sedan-sports.glb',
+    rack: false,
+    cargo: false,
+    handling: {
+      maxSpeed: 21, accel: 9, brake: 15.5, reverseAccel: 4.5,
+      drag: 0.42, engineBrake: 2.7, steerRate: 2.0,
+    },
+  },
+  {
+    id: 'tractor',
+    era: '1950s',
+    name: 'Meadow Tractor',
+    model: 'tractor.glb',
+    rack: false,
+    cargo: false,
+    handling: {
+      maxSpeed: 7.5, accel: 4.2, brake: 9, reverseAccel: 3,
+      drag: 0.8, engineBrake: 4.2, steerRate: 2.1,
+    },
+  },
 ];
 
 // Special regions (Stage E+). Autumn is the default everywhere else. Weight = smoothstep over `blend` units past `r`.

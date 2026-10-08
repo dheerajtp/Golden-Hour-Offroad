@@ -2,7 +2,7 @@
 
 A golden-hour, low-poly open-world offroading game that runs entirely in the
 browser. Zero backend, no build step — vanilla JS ES modules + Three.js.
-Drive three era-distinct 4x4s over a carved trail through rolling hills,
+Drive eight era-distinct vehicles over a carved trail through rolling hills,
 race friends from marked gates, and watch the sun set over the world together.
 
 Send a friend a session code and they appear in your world: free roam
@@ -16,8 +16,8 @@ together, then pull up to a start gate for an instant 3-2-1 race to the finish.
 - **Full day/night cycle** — dawn → golden hour (default spawn) → dusk →
   night with moonlight and lit cabin windows → dawn, looping (60-minute
   cycle; time slows to a crawl while you're parked or sitting/lying)
-- **3 trucks** — era-distinct 60s/70s/80s 4x4s (all unlocked), arcade
-  physics with suspension bounce
+- **8 vehicles** — era-distinct rides from a 50s tractor to a 90s sports
+  sedan (all unlocked), arcade physics with suspension bounce
 - **Multiplayer** — free P2P (WebRTC via PeerJS), host-authoritative,
   share a 4-char code to join each other's world
 - **Opt-in races** — drive into a marked start gate with a friend,
@@ -60,7 +60,7 @@ Any static file server works, e.g. `npx serve .`.
 | `S` / `↓` | Brake / reverse |
 | `A` `D` / `←` `→` | Steer |
 | `F` | Exit truck / get in / sit → lie → stand |
-| `1` / `2` / `3` | Switch trucks |
+| `1` … `8` | Switch vehicle |
 | `T` (hold) | 25× time fast-forward |
 | `L` | Headlights: auto → forced → auto |
 | `E` | Rest at a cabin/camp at night (jump to early morning) |

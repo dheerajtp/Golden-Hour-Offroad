@@ -353,8 +353,14 @@ async function boot() {
     touch.setMuted(audio.isMuted());
   };
 
+  const nextTruck = () => {
+    if (foot) { toast('Get in the truck first'); return; }
+    switchTruck((garageIndex + 1) % GARAGE.length);
+  };
+
   const touch = initTouch(driver, {
     switchTruck,
+    nextTruck,
     toggleLights,
     footAction,
     setFast: (on) => { timeScale = on ? 25 : 1; },
@@ -370,8 +376,11 @@ async function boot() {
     else if (e.code === 'KeyE') tryRest();
     else if (e.code === 'KeyF') footAction();
     else if (e.code === 'KeyN') toggleMute();
-    const m = /^Digit([1-3])$/.exec(e.code);
-    if (m) switchTruck(Number(m[1]) - 1);
+    const m = /^Digit([1-9])$/.exec(e.code);
+    if (m) {
+      const idx = Number(m[1]) - 1;
+      if (idx < GARAGE.length) switchTruck(idx);
+    }
   });
   window.addEventListener('keyup', (e) => {
     if (e.target && e.target.tagName === 'INPUT') return;

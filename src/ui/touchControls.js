@@ -65,9 +65,7 @@ export function initTouch(driver, actions) {
     }
     return b;
   };
-  small('tTruck1', '1', false, () => actions.switchTruck(0));
-  small('tTruck2', '2', false, () => actions.switchTruck(1));
-  small('tTruck3', '3', false, () => actions.switchTruck(2));
+  small('tTruck', '&#8635;', false, () => actions.nextTruck());
   small('tLights', 'L', false, () => actions.toggleLights());
   small('tF', 'F', false, () => actions.footAction());
   small('tFast', '&#187;', true, () => actions.setFast(true), () => actions.setFast(false));
