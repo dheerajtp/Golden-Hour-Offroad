@@ -92,9 +92,14 @@
     .tbtn { width: 68px; height: 68px; }
     #tRight { left: 94px; }
     #tBrake { right: 94px; }
+    #tBar { gap: 6px; }
+    #tBar .tbtn { width: 40px; height: 40px; font-size: 13px; }
     #panel { width: 200px; top: 8px; right: 8px; }
     #raceHud { font-size: 74px; }
     #restHint { font-size: 14px; bottom: 32%; }
+  }
+  @media (max-width: 760px) {
+    #tLeft, #tRight, #tBrake { bottom: 76px; }
   }
   #raceToast {
     position: absolute; left: 50%; top: 20%; transform: translateX(-50%);
