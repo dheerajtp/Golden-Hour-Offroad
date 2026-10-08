@@ -76,8 +76,9 @@ export const REST = {
 };
 
 export const AUDIO = {
-  master: 0.8,
-  wind: 0.55, nature: 0.6, engine: 0.5, water: 0.55, fire: 0.5, ui: 0.5,
+  master: 0.6,
+  wind: 0.5, nature: 0.45, engine: 0.45, water: 0.5, fire: 0.45, ui: 0.4,
+  pad: 0.35,
 };
 
 export const ANIMALS = {

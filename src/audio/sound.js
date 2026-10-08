@@ -1,7 +1,6 @@
 import { AUDIO, WATER } from '../config.js';
 
 const MUTE_KEY = 'gh4x-muted';
-const TAU = Math.PI * 2;
 
 function noiseBuffer(ac, seconds = 4) {
   const len = Math.floor(ac.sampleRate * seconds);
@@ -25,22 +24,31 @@ export function makeAudio() {
   let master = null;
   let windGain, windLp;
   let engGain, engOsc, engOsc2;
-  let waterGain, waterLp, lapDepth;
+  let waterGain, lapDepth;
   let fireGain;
-  let cricketGate;
   let natureGain, uiGain;
   let noise = null;
   let started = false;
-  let birdNext = 2 + Math.random() * 3;
+  let birdNext = 4 + Math.random() * 6;
+  let cricketNext = 2 + Math.random() * 4;
   let fireNext = 0;
   let gustPhase = Math.random() * 10;
 
   function build() {
     ac = new AC();
     noise = noiseBuffer(ac);
+
+    // Master -> gentle compressor (nothing ever jumps out) -> speakers
     master = ac.createGain();
     master.gain.value = muted ? 0 : AUDIO.master;
-    master.connect(ac.destination);
+    const comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.knee.value = 12;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.02;
+    comp.release.value = 0.3;
+    master.connect(comp);
+    comp.connect(ac.destination);
 
     const cat = (v) => {
       const g = ac.createGain();
@@ -49,9 +57,36 @@ export function makeAudio() {
       return g;
     };
     natureGain = cat(AUDIO.nature);
-    uiGain = cat(AUDIO.ui * 0.3);
+    uiGain = cat(AUDIO.ui * 0.5);
 
-    // Wind: looped brown noise -> lowpass (gust-swept) -> gain
+    // Warm grounding pad: two detuned sines (fifth) -> lowpass -> breathing gain
+    const padGain = cat(AUDIO.pad * 0.5);
+    const padLp = ac.createBiquadFilter();
+    padLp.type = 'lowpass';
+    padLp.frequency.value = 500;
+    const padMix = ac.createGain();
+    padMix.gain.value = 0.4;
+    const padOsc1 = ac.createOscillator();
+    padOsc1.type = 'sine';
+    padOsc1.frequency.value = 96.4;
+    const padOsc2 = ac.createOscillator();
+    padOsc2.type = 'sine';
+    padOsc2.frequency.value = 143.7;
+    padOsc1.connect(padMix);
+    padOsc2.connect(padMix);
+    padMix.connect(padLp);
+    padLp.connect(padGain);
+    const padLfo = ac.createOscillator();
+    padLfo.frequency.value = 0.04;
+    const padDepth = ac.createGain();
+    padDepth.gain.value = AUDIO.pad * 0.15;
+    padLfo.connect(padDepth);
+    padDepth.connect(padGain.gain);
+    padOsc1.start();
+    padOsc2.start();
+    padLfo.start();
+
+    // Wind: looped brown noise -> lowpass (gust-swept) -> gain + breathing LFO
     windGain = cat(0);
     windLp = ac.createBiquadFilter();
     windLp.type = 'lowpass';
@@ -68,8 +103,15 @@ export function makeAudio() {
     windLfoAmt.gain.value = 140;
     windLfo.connect(windLfoAmt);
     windLfoAmt.connect(windLp.frequency);
+    const windBreath = ac.createOscillator();
+    windBreath.frequency.value = 0.05;
+    const windBreathAmt = ac.createGain();
+    windBreathAmt.gain.value = AUDIO.wind * 0.12;
+    windBreath.connect(windBreathAmt);
+    windBreathAmt.connect(windGain.gain);
     windSrc.start();
     windLfo.start();
+    windBreath.start();
 
     // Engine: saw + octave saw + filtered noise -> gain
     engGain = cat(0);
@@ -106,7 +148,7 @@ export function makeAudio() {
 
     // Water: looped noise -> lowpass -> gain (lap LFO scaled by proximity)
     waterGain = cat(0);
-    waterLp = ac.createBiquadFilter();
+    const waterLp = ac.createBiquadFilter();
     waterLp.type = 'lowpass';
     waterLp.frequency.value = 520;
     const waterSrc = ac.createBufferSource();
@@ -122,24 +164,6 @@ export function makeAudio() {
     lapDepth.connect(waterGain.gain);
     waterSrc.start();
     lapLfo.start();
-
-    // Crickets: sine pulse train (gain gated by night, modulated by square LFO)
-    const crickets = ac.createOscillator();
-    crickets.type = 'sine';
-    crickets.frequency.value = 4300;
-    cricketGate = ac.createGain();
-    cricketGate.gain.value = 0;
-    const crLfo = ac.createOscillator();
-    crLfo.type = 'square';
-    crLfo.frequency.value = 26;
-    const crDepth = ac.createGain();
-    crDepth.gain.value = 0.5;
-    crLfo.connect(crDepth);
-    crDepth.connect(cricketGate.gain);
-    crickets.connect(cricketGate);
-    cricketGate.connect(natureGain);
-    crickets.start();
-    crLfo.start();
 
     // Fire crackle: shared by short-lived bursts
     fireGain = cat(0);
@@ -162,14 +186,16 @@ export function makeAudio() {
     applyMute();
   }
 
-  function blip(freq, dur, vol, type = 'triangle') {
+  // Soft mallet/bell tone: sine, 8 ms attack, long exponential release
+  function tone(freq, dur, vol, attack = 0.008) {
     if (!ac || ac.state !== 'running') return;
     const t0 = ac.currentTime;
     const o = ac.createOscillator();
-    o.type = type;
+    o.type = 'sine';
     o.frequency.value = freq;
     const g = ac.createGain();
-    g.gain.setValueAtTime(vol, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(g);
     g.connect(uiGain);
@@ -177,7 +203,8 @@ export function makeAudio() {
     o.stop(t0 + dur + 0.02);
   }
 
-  function chirp(f0, f1, dur, vol) {
+  // Soft coo-like bird note: sine with gentle downward gliss
+  function coo(f0, f1, dur, vol) {
     const t0 = ac.currentTime;
     const o = ac.createOscillator();
     o.type = 'sine';
@@ -185,7 +212,7 @@ export function makeAudio() {
     o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
     const g = ac.createGain();
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.linearRampToValueAtTime(vol, t0 + 0.015);
+    g.gain.linearRampToValueAtTime(vol, t0 + 0.06);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(g);
     g.connect(natureGain);
@@ -194,14 +221,39 @@ export function makeAudio() {
   }
 
   function birdMotif() {
-    const n = 2 + Math.floor(Math.random() * 3);
-    const f0 = 2200 + Math.random() * 1900;
+    const n = 2 + Math.floor(Math.random() * 2);
+    const f0 = 1100 + Math.random() * 1100;
     let delay = 0;
     for (let i = 0; i < n; i++) {
-      const dur = 0.06 + Math.random() * 0.09;
-      const f = f0 * (0.94 + Math.random() * 0.12);
-      setTimeout(() => chirp(f, f * (1.15 + Math.random() * 0.3), dur, 0.16), delay * 1000);
-      delay += 0.11 + Math.random() * 0.12;
+      const dur = 0.25 + Math.random() * 0.2;
+      const f = f0 * (0.96 + Math.random() * 0.08);
+      setTimeout(() => coo(f, f * 0.82, dur, 0.08), delay * 1000);
+      delay += 0.3 + Math.random() * 0.2;
+    }
+  }
+
+  // Sparse cricket chirp: 3-5 soft pulses, then long rest
+  function cricketBurst() {
+    const n = 3 + Math.floor(Math.random() * 3);
+    const f = 3600 + Math.random() * 600;
+    let delay = 0;
+    for (let i = 0; i < n; i++) {
+      setTimeout(() => {
+        if (!ac || ac.state !== 'running') return;
+        const t0 = ac.currentTime;
+        const o = ac.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = f;
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(0.05, t0 + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.03);
+        o.connect(g);
+        g.connect(natureGain);
+        o.start(t0);
+        o.stop(t0 + 0.05);
+      }, delay * 1000);
+      delay += 0.05;
     }
   }
 
@@ -245,16 +297,16 @@ export function makeAudio() {
       else if (ac.state === 'suspended') ac.resume();
     },
     click(kind) {
-      const m = { truck: [440, 0.07], lights: [620, 0.07], foot: [380, 0.06], rest: [300, 0.12] };
-      const [f, d] = m[kind] || [440, 0.06];
-      blip(f, d, 0.5, 'square');
+      const m = { truck: [294, 0.18], lights: [440, 0.18], foot: [330, 0.16], rest: [392, 0.35] };
+      const [f, d] = m[kind] || [294, 0.18];
+      tone(f, d, 0.5);
     },
     beep(kind) {
-      if (kind === 'tick') blip(880, 0.09, 0.5, 'square');
-      else if (kind === 'go') blip(1320, 0.22, 0.6, 'square');
+      if (kind === 'tick') tone(660, 0.25, 0.45);
+      else if (kind === 'go') tone(880, 0.4, 0.5);
       else if (kind === 'chime') {
-        blip(988, 0.18, 0.5, 'triangle');
-        setTimeout(() => blip(1319, 0.3, 0.5, 'triangle'), 140);
+        tone(523, 0.7, 0.45);
+        setTimeout(() => tone(784, 0.7, 0.45), 220);
       }
     },
     state: () => ({ muted, ctxState: ac ? ac.state : 'none', started }),
@@ -263,7 +315,7 @@ export function makeAudio() {
       if (!started) started = true;
       const t = ac.currentTime;
 
-      // Wind: stronger by day, gusting
+      // Wind: stronger by day, gusting, breathing
       gustPhase += dt * 0.11;
       const gust = 0.5 + 0.5 * (Math.sin(gustPhase) * 0.6 + Math.sin(gustPhase * 2.7 + 1.3) * 0.4);
       const windAmt = AUDIO.wind * (0.09 + 0.15 * (1 - env.nightFactor) + 0.13 * gust);
@@ -277,17 +329,21 @@ export function makeAudio() {
       engOsc2.frequency.setTargetAtTime(f * 2, t, 0.12);
       engGain.gain.setTargetAtTime(AUDIO.engine * engAmt, t, 0.15);
 
-      // Birds by day, crickets by night
+      // Sparse doves by day, sparse crickets by night — both pause, both quiet
       if (env.nightFactor < 0.5) {
         birdNext -= dt;
         if (birdNext <= 0) {
           birdMotif();
-          birdNext = 1.3 + Math.random() * 3.5;
+          birdNext = 5 + Math.random() * 9;
         }
       }
-      cricketGate.gain.setTargetAtTime(
-        env.nightFactor > 0.55 ? AUDIO.nature * 0.09 : 0, t, 0.8,
-      );
+      if (env.nightFactor > 0.55) {
+        cricketNext -= dt;
+        if (cricketNext <= 0) {
+          cricketBurst();
+          cricketNext = 2.5 + Math.random() * 6.5;
+        }
+      }
 
       // Water proximity
       const pp = env.playerPos();
