@@ -1,6 +1,8 @@
 const GLYPHS = {
   left: '&#9664;', right: '&#9654;', gas: '&#9650;', brake: '&#9660;',
 };
+const SND_ON = '&#128266;';
+const SND_OFF = '&#128263;';
 
 function pressBtn(el, onPress, onRelease) {
   const down = (e) => {
@@ -25,7 +27,7 @@ export function initTouch(driver, actions) {
   const forced = new URLSearchParams(location.search).has('touch');
   const enabled = coarse || forced;
   const wrap = document.getElementById('touch');
-  if (!enabled) return { enabled: false, isTouch: false };
+  if (!enabled) return { enabled: false, isTouch: false, setMuted: () => {} };
   wrap.classList.remove('hidden');
   document.body.classList.add('touch');
 
@@ -71,5 +73,13 @@ export function initTouch(driver, actions) {
   small('tFast', '&#187;', true, () => actions.setFast(true), () => actions.setFast(false));
   small('tMenu', '&#9776;', false, () => actions.togglePanel());
 
-  return { enabled: true, isTouch: true };
+  const mbtn = mk('tMute', actions.isMuted() ? SND_OFF : SND_ON, 'small');
+  mbtn.addEventListener('click', (e) => { e.preventDefault(); actions.toggleMute(); });
+  mbtn.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  return {
+    enabled: true,
+    isTouch: true,
+    setMuted: (m) => { mbtn.innerHTML = m ? SND_OFF : SND_ON; },
+  };
 }

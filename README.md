@@ -31,6 +31,10 @@ together, then pull up to a start gate for an instant 3-2-1 race to the finish.
   morning fog, moon, shooting stars, rainbow; currently off: rain, mist,
   fireflies, leaves, smoke, butterflies)
 - **Mobile** — touch controls auto-enable on coarse pointers (or `?touch=1`)
+- **Sound** — procedural Web Audio (no audio files): wind & gusts, daytime
+  birdsong, night crickets, engine note tied to speed, water lapping,
+  campfire crackle, UI clicks and race countdown cues. Mute with `N` or the
+  🔊 button (top-left on mobile); the setting is remembered
 
 ## Quick start (local)
 
@@ -58,9 +62,10 @@ Any static file server works, e.g. `npx serve .`.
 | `L` | Headlights: auto → forced → auto |
 | `E` | Rest at a cabin/camp at night (jump to early morning) |
 | `M` | Session panel (multiplayer code) |
+| `N` | Mute/unmute sound |
 
 Mobile shows on-screen gas/steer/brake plus truck, enter/exit (`F`),
-lights, fast, and menu buttons.
+lights, fast, and menu buttons, and a 🔊 sound toggle (top-left).
 
 ### Multiplayer
 

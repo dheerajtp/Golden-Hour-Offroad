@@ -75,6 +75,11 @@ export const REST = {
   fadeMs: 550,
 };
 
+export const AUDIO = {
+  master: 0.8,
+  wind: 0.55, nature: 0.6, engine: 0.5, water: 0.55, fire: 0.5, ui: 0.5,
+};
+
 export const ANIMALS = {
   fleeDist: 12,
   fleeFar: 40,

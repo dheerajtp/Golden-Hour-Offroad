@@ -6,6 +6,7 @@ import { buildForest } from './world/forest.js';
 import { buildProps, updateProps } from './world/props.js';
 import { buildWater, updateWater } from './world/water.js';
 import { makeAtmosphere } from './world/atmosphere.js';
+import { makeAudio } from './audio/sound.js';
 import { buildStructures, planSites, updateStructures } from './world/structures.js';
 import { buildRegionProps, updateRegionProps } from './world/regionProps.js';
 import { regionAt, regionWeights } from './world/regions.js';
@@ -71,6 +72,15 @@ async function boot() {
   const atmosphere = makeAtmosphere(terrain, smokeSources);
   scene.add(atmosphere.group);
 
+  const audio = makeAudio();
+  const audioWake = () => {
+    audio.resume();
+    window.removeEventListener('pointerdown', audioWake);
+    window.removeEventListener('keydown', audioWake);
+  };
+  window.addEventListener('pointerdown', audioWake);
+  window.addEventListener('keydown', audioWake);
+
   const driver = new Driver(terrain);
   let vehicle = await createTruck(GARAGE[0], true);
   scene.add(vehicle.root);
@@ -126,6 +136,8 @@ async function boot() {
   let garageIndex = 0;
   let timeScale = 1;
   let lightsManual = null;
+  let prevRaceState = 'idle';
+  let prevCd = -1;
   let restAvailable = false;
   let hintText = null;
   let hintKind = null;
@@ -138,6 +150,7 @@ async function boot() {
   async function switchTruck(idx) {
     if (idx === garageIndex || switching) return;
     if (foot) { toast('Get in the truck first'); return; }
+    audio.click('truck');
     switching = true;
     garageIndex = idx;
     try {
@@ -189,6 +202,7 @@ async function boot() {
     const slot = garage.slots.find((s) => s.index === idx);
     if (!slot || slot.id === currentVehId) return;
     if (Math.hypot(walker.pos.x - slot.x, walker.pos.z - slot.z) >= FOOT.enter) return;
+    audio.click('truck');
     switching = true;
     garageIndex = idx;
     try {
@@ -222,6 +236,7 @@ async function boot() {
     const autoOn = sky.nightFactor > HEADLIGHT.autoOn;
     if (lightsManual === null) lightsManual = !autoOn;
     else lightsManual = null;
+    audio.click('lights');
   }
 
   function fadeThen(cb) {
@@ -261,6 +276,7 @@ async function boot() {
   function tryRest() {
     if (!restAvailable) return;
     if (zone.state !== 'idle') { toast('Race in progress'); return; }
+    audio.click('rest');
     const kind = nearestRestAnchor()?.kind;
     if (session.role === 'guest') {
       session.sendRest();
@@ -303,6 +319,7 @@ async function boot() {
       walker.spawn(driver.pos.x + rx * 1.7, driver.pos.z + rz * 1.7, driver.yaw);
       scene.add(walker.mesh);
       foot = true;
+      audio.click('foot');
       return;
     }
     if (walker.pose === 'stand') {
@@ -311,6 +328,7 @@ async function boot() {
         if (ent.kind === 'truck') {
           scene.remove(walker.mesh);
           foot = false;
+          audio.click('foot');
         } else {
           enterGarage(ent.index);
         }
@@ -322,6 +340,7 @@ async function boot() {
     } else {
       walker.pose = 'stand';
     }
+    audio.click('foot');
   }
 
   restHintEl.addEventListener('click', () => {
@@ -329,12 +348,19 @@ async function boot() {
     else footAction();
   });
 
+  const toggleMute = () => {
+    audio.toggleMute();
+    touch.setMuted(audio.isMuted());
+  };
+
   const touch = initTouch(driver, {
     switchTruck,
     toggleLights,
     footAction,
     setFast: (on) => { timeScale = on ? 25 : 1; },
     togglePanel: () => document.getElementById('panel').classList.toggle('hidden'),
+    toggleMute,
+    isMuted: () => audio.isMuted(),
   });
 
   window.addEventListener('keydown', (e) => {
@@ -343,6 +369,7 @@ async function boot() {
     else if (e.code === 'KeyL') toggleLights();
     else if (e.code === 'KeyE') tryRest();
     else if (e.code === 'KeyF') footAction();
+    else if (e.code === 'KeyN') toggleMute();
     const m = /^Digit([1-3])$/.exec(e.code);
     if (m) switchTruck(Number(m[1]) - 1);
   });
@@ -421,6 +448,10 @@ async function boot() {
       sunDir: sky.sunDir, sunElev: Math.asin(sky.sunDir.y),
     });
     vehicle.setHeadlights(sky.nightFactor, lightsManual, rawDt);
+    audio.update(dt, {
+      timeOfDay, nightFactor: sky.nightFactor, playerPos,
+      speed: driver.speed, onFoot: foot, nearFire: nearFire(),
+    });
 
     const actors = foot
       ? []
@@ -431,6 +462,19 @@ async function boot() {
     zone.update(rawDt, actors, session.role !== 'guest');
     const net = zone.takeNet();
     if (net) session.broadcast(net);
+    if (zone.state !== prevRaceState) {
+      if (zone.state === 'racing') audio.beep('go');
+      else if (zone.state === 'done') audio.beep('chime');
+      prevRaceState = zone.state;
+      prevCd = -1;
+    }
+    if (zone.state === 'countdown') {
+      const cd = Math.ceil(zone.timer);
+      if (cd >= 1 && cd <= 3 && cd !== prevCd) {
+        audio.beep('tick');
+        prevCd = cd;
+      }
+    }
     updateRaceHud(zone);
 
     const restAnchor = zone.state === 'idle' && sky.nightFactor > REST.nightMin
@@ -550,6 +594,7 @@ async function boot() {
       return g ? g.count : 0;
     },
     hint: () => hintText,
+    audio: () => ({ ...audio.state(), toggle: toggleMute }),
     atmosphere: () => ({
       counts: atmosphere.counts(),
       flags: atmosphere.flags,
