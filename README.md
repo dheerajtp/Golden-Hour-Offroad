@@ -19,7 +19,8 @@ together, then pull up to a start gate for an instant 3-2-1 race to the finish.
 - **8 vehicles** — era-distinct rides from a 50s tractor to a 90s sports
   sedan (all unlocked), arcade physics with suspension bounce
 - **Multiplayer** — free P2P (WebRTC via PeerJS), host-authoritative,
-  share a 4-char code to join each other's world
+  share a 4-char code to join each other's world, with in-session text
+  chat in the panel
 - **Opt-in races** — drive into a marked start gate with a friend,
   3-2-1 countdown, first to the finish wins *(currently disabled for a
   stress-free session — set `RACE.enabled = true` in `src/config.js` to
@@ -76,6 +77,8 @@ lights, fast, and menu buttons, and a 🔊 sound toggle (top-left).
 2. Friend opens the same build, enters the code, joins.
 3. You now share the same world — positions sync at 15 Hz; races run on the
    host.
+4. Chat from the panel (message box at the bottom) — messages reach
+   everyone in the session; a toast pops up if the panel is closed.
 
 Requires internet for PeerJS's free public signaling (0.peerjs.com). All
 gameplay itself is peer-to-peer.

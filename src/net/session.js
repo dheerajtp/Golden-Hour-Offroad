@@ -115,6 +115,19 @@ export class Session {
       case 'rest':
         if (this.role === 'host') this.emit('rest', fromId);
         break;
+      case 'chat': {
+        const text = typeof msg.text === 'string' ? msg.text.slice(0, 200) : '';
+        if (!text) break;
+        if (this.role === 'host') {
+          this.emit('chat', fromId, text);
+          for (const [id, c] of this.conns) {
+            if (id !== fromId && c.open) c.send({ t: 'chat', text, from: fromId });
+          }
+        } else {
+          this.emit('chat', msg.from || 'host', text);
+        }
+        break;
+      }
       default:
         break;
     }
@@ -146,6 +159,16 @@ export class Session {
 
   sendRest() {
     if (this.hostConn && this.hostConn.open) this.hostConn.send({ t: 'rest' });
+  }
+
+  sendChat(text) {
+    if (this.role === 'solo') return;
+    const t = String(text || '').trim().slice(0, 200);
+    if (!t) return;
+    this.emit('chat', 'me', t);
+    const msg = { t: 'chat', text: t };
+    if (this.role === 'host') this.broadcast(msg);
+    else if (this.hostConn && this.hostConn.open) this.hostConn.send(msg);
   }
 
   reset() {

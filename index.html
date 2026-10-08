@@ -39,6 +39,22 @@
     padding: 6px 7px; text-transform: uppercase; letter-spacing: 0.2em;
   }
   #pCodeRow, #pControls { margin-top: 8px; }
+  #pChat { margin-top: 10px; border-top: 1px solid rgba(255, 201, 160, 0.25); padding-top: 8px; }
+  #pChatLog {
+    max-height: 132px; overflow-y: auto; margin-bottom: 6px;
+    font: 500 12px/1.45 system-ui, sans-serif;
+    display: flex; flex-direction: column; gap: 3px;
+    scrollbar-width: thin;
+  }
+  #pChatLog:empty { display: none; }
+  .chatMsg { overflow-wrap: anywhere; word-break: break-word; }
+  .chatMsg b { color: #ffc9a0; font-size: 12px; }
+  .chatMsg span { color: rgba(255, 240, 220, 0.92); }
+  #pChatRow { display: flex; gap: 6px; }
+  #panel #pChatIn {
+    flex: 1; min-width: 0; width: auto; letter-spacing: normal; text-transform: none;
+    font: 500 12px/1 system-ui, sans-serif;
+  }
   #raceHud {
     position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%);
     font: 800 110px/1 system-ui, sans-serif; color: #fff2e0;
@@ -131,6 +147,13 @@
     <button id="pHostBtn">host</button>
   </div>
   <button id="pLeave" class="hidden">leave session</button>
+  <div id="pChat" class="hidden">
+    <div id="pChatLog"></div>
+    <div id="pChatRow">
+      <input id="pChatIn" maxlength="200" placeholder="say something…" autocomplete="off">
+      <button id="pChatSend">send</button>
+    </div>
+  </div>
 </div>
 <div id="raceHud" class="hidden"></div>
 <div id="raceToast" class="hidden"></div>
