@@ -58,7 +58,16 @@ export class Walker {
     this.phase = 0;
     this.crouch = 1;
     this.tilt = 0;
+    this.lookPitch = 0;
     this.mesh = makePerson();
+  }
+
+  setPose(pose) {
+    this.pose = pose;
+    if (pose === 'sit') this.lookPitch = 0.05;
+    else if (pose === 'lie') this.lookPitch = 1.3;
+    else this.lookPitch = 0;
+    this.mesh.visible = pose === 'stand';
   }
 
   spawn(x, z, yaw) {
@@ -68,6 +77,8 @@ export class Walker {
     this.phase = 0;
     this.crouch = 1;
     this.tilt = 0;
+    this.lookPitch = 0;
+    this.mesh.visible = true;
     this.#poseMesh(0.0001);
   }
 
@@ -85,6 +96,11 @@ export class Walker {
         this.pos.z = Math.max(-285, Math.min(285, this.pos.z + sz * move * dt));
         this.phase += dt * 9 * Math.abs(move) / FOOT.walk;
       }
+    } else {
+      const turn = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+      this.yaw -= turn * 1.8 * dt;
+      const look = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
+      this.lookPitch = Math.max(-1.15, Math.min(1.45, this.lookPitch + look * 1.15 * dt));
     }
     this.pos.y = this.terrain.heightAt(this.pos.x, this.pos.z);
     this.#poseMesh(dt, move);

@@ -6,21 +6,49 @@
 <title>Golden Hour Offroad</title>
 <link rel="icon" href="data:,">
 <style>
+  :root {
+    --sl: env(safe-area-inset-left, 0px);
+    --sr: env(safe-area-inset-right, 0px);
+    --st: env(safe-area-inset-top, 0px);
+    --sb: env(safe-area-inset-bottom, 0px);
+    --map-size: 132px;
+    --btn: 76px;
+    --btn-sm: 46px;
+  }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #141c33; overscroll-behavior: none; }
   #app, #app canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #loading {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     font: 600 15px/1.4 system-ui, sans-serif; color: #ffd9a0; background: #141c33;
-    letter-spacing: 0.04em; transition: opacity 0.5s; z-index: 10;
+    letter-spacing: 0.04em; transition: opacity 0.5s; z-index: 50;
   }
   #loading.hidden { opacity: 0; pointer-events: none; }
   #hint {
-    position: absolute; left: 14px; bottom: 12px; z-index: 5;
+    position: absolute; left: calc(14px + var(--sl)); right: calc(14px + var(--sr));
+    bottom: calc(12px + var(--sb)); z-index: 5;
     font: 500 12px/1.5 system-ui, sans-serif; color: rgba(255, 240, 220, 0.85);
     text-shadow: 0 1px 3px rgba(0,0,0,0.6); pointer-events: none;
   }
+  body.touch #hint { display: none; }
+  #mapWrap {
+    position: absolute; left: calc(10px + var(--sl)); top: calc(10px + var(--st));
+    width: var(--map-size); height: var(--map-size); z-index: 14;
+    border-radius: 10px; overflow: hidden; background: rgba(20, 28, 51, 0.55);
+    border: 1px solid rgba(255, 201, 160, 0.5); box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4);
+  }
+  #minimap { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+  #mapHint {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 0;
+    text-align: center; font: 600 9px/1 system-ui, sans-serif; letter-spacing: 0.06em;
+    text-transform: uppercase; color: rgba(255, 240, 220, 0.8);
+    background: linear-gradient(transparent, rgba(12, 16, 28, 0.65)); pointer-events: none;
+  }
+  body:not(.touch) #mapHint { display: none; }
   #panel {
-    position: absolute; top: 12px; right: 12px; z-index: 20; width: 230px;
+    position: absolute; top: calc(12px + var(--st)); right: calc(12px + var(--sr)); z-index: 20;
+    width: min(230px, calc(100vw - 24px));
+    max-height: calc(100dvh - var(--st) - var(--sb) - 24px); overflow-y: auto;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
     background: rgba(20, 28, 51, 0.88); border: 1px solid rgba(255, 201, 160, 0.35);
     border-radius: 8px; padding: 12px; color: #ffd9a0;
     font: 500 13px/1.6 system-ui, sans-serif;
@@ -57,7 +85,7 @@
   }
   #raceHud {
     position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%);
-    font: 800 110px/1 system-ui, sans-serif; color: #fff2e0;
+    font: 800 clamp(58px, 16vw, 110px)/1 system-ui, sans-serif; color: #fff2e0;
     text-shadow: 0 4px 22px rgba(0,0,0,0.55); z-index: 15; pointer-events: none;
   }
   #raceHud.hidden, #raceToast.hidden, #restHint.hidden, #touch.hidden { display: none; }
@@ -66,7 +94,8 @@
     font: 700 16px/1.3 system-ui, sans-serif; color: #141c33;
     background: rgba(255, 217, 160, 0.92); border-radius: 8px;
     padding: 10px 18px; z-index: 16; cursor: pointer;
-    pointer-events: auto; white-space: nowrap;
+    pointer-events: auto; white-space: normal; text-align: center;
+    max-width: calc(100vw - 32px);
     animation: restPulse 1.6s ease-in-out infinite;
   }
   @keyframes restPulse { 50% { opacity: 0.6; } }
@@ -79,52 +108,87 @@
   body.touch { touch-action: none; }
   .tbtn {
     position: absolute; pointer-events: auto;
-    width: 76px; height: 76px; border-radius: 50%;
+    width: var(--btn); height: var(--btn); border-radius: 50%;
     background: rgba(20, 28, 51, 0.5); border: 1.5px solid rgba(255, 201, 160, 0.45);
-    color: #ffd9a0; font: 700 26px/1 system-ui, sans-serif;
+    color: #ffd9a0; font: 700 clamp(20px, 6vw, 26px)/1 system-ui, sans-serif;
     display: flex; align-items: center; justify-content: center;
     user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
     touch-action: none; padding: 0;
   }
   .tbtn:active, .tbtn.on { background: rgba(184, 68, 46, 0.75); }
-  .tbtn.small {
-    width: 46px; height: 46px; font-size: 15px;
-    background: rgba(20, 28, 51, 0.42);
-  }
-  #tLeft { left: 16px; bottom: 34px; }
-  #tRight { left: 106px; bottom: 34px; }
-  #tGas { right: 16px; bottom: 122px; }
-  #tBrake { right: 106px; bottom: 34px; }
-  #tMute { left: 16px; top: 16px; font-size: 20px; }
+  .tbtn.small { width: var(--btn-sm); height: var(--btn-sm); font-size: 15px; background: rgba(20, 28, 51, 0.42); }
+  #tLeft { left: calc(14px + var(--sl)); bottom: calc(30px + var(--sb)); }
+  #tRight { left: calc(14px + var(--sl) + var(--btn) + 12px); bottom: calc(30px + var(--sb)); }
+  #tGas { right: calc(14px + var(--sr)); bottom: calc(30px + var(--sb) + var(--btn) + 12px); }
+  #tBrake { right: calc(14px + var(--sr) + var(--btn) + 12px); bottom: calc(30px + var(--sb)); }
+  #tMute { left: calc(12px + var(--sl)); top: calc(12px + var(--st)); font-size: 20px; }
+  body.touch #tMute { top: calc(12px + var(--st) + var(--map-size) + 16px); }
   #tBar {
-    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
-    display: flex; gap: 8px; pointer-events: auto;
+    position: absolute; left: 50%; bottom: calc(12px + var(--sb)); transform: translateX(-50%);
+    display: flex; gap: 8px; pointer-events: auto; max-width: calc(100vw - 20px);
   }
   #tBar .tbtn {
-    position: static; width: 46px; height: 46px; font-size: 15px;
+    position: static; width: var(--btn-sm); height: var(--btn-sm); font-size: 14px;
     background: rgba(20, 28, 51, 0.42);
   }
-  @media (max-width: 480px) {
-    #hint { display: none; }
-    .tbtn { width: 68px; height: 68px; }
-    #tRight { left: 94px; }
-    #tBrake { right: 94px; }
-    #tBar { gap: 6px; }
-    #tBar .tbtn { width: 40px; height: 40px; font-size: 13px; }
-    #panel { width: 200px; top: 8px; right: 8px; }
-    #raceHud { font-size: 74px; }
-    #restHint { font-size: 14px; bottom: 32%; }
-  }
   @media (max-width: 760px) {
-    #tLeft, #tRight, #tBrake { bottom: 76px; }
+    #tLeft, #tRight, #tBrake { bottom: calc(76px + var(--sb)); }
+  }
+  @media (max-width: 480px) {
+    :root { --map-size: 112px; --btn: 64px; --btn-sm: 44px; }
+    #panel { width: min(200px, calc(100vw - 16px)); top: calc(8px + var(--st)); right: calc(8px + var(--sr)); }
+    #restHint { font-size: 14px; padding: 9px 14px; }
+    body.touch #restHint { top: 36%; bottom: auto; }
+  }
+  @media (max-width: 360px) {
+    :root { --map-size: 104px; --btn: 60px; }
+    #panel {
+      width: min(180px, calc(100vw - 16px));
+      top: calc(8px + var(--st) + var(--map-size) + 16px);
+    }
+  }
+  body.map-open #touch, body.map-open #restHint { visibility: hidden; }
+  @media (orientation: landscape) and (max-height: 520px) {
+    :root { --map-size: 88px; --btn: 58px; --btn-sm: 42px; }
+    body.touch #tMute { top: calc(12px + var(--st)); left: calc(12px + var(--sl) + var(--map-size) + 14px); }
+    #tLeft, #tRight, #tBrake { bottom: calc(10px + var(--sb)); }
+    #tGas { bottom: calc(10px + var(--sb) + var(--btn) + 10px); }
+    #tBar { bottom: calc(8px + var(--sb)); gap: 6px; }
+    body.touch #restHint { top: 34%; bottom: auto; font-size: 13px; padding: 7px 12px; }
+    #hint { display: none; }
   }
   #raceToast {
     position: absolute; left: 50%; top: 20%; transform: translateX(-50%);
     font: 700 24px/1.3 system-ui, sans-serif; color: #ffd9a0;
     background: rgba(20, 28, 51, 0.85); border: 1px solid rgba(255, 201, 160, 0.4);
     border-radius: 8px; padding: 12px 22px; z-index: 15; pointer-events: none;
-    text-align: center;
+    text-align: center; max-width: calc(100vw - 32px);
   }
+  #mapFull {
+    position: fixed; inset: 0; z-index: 35; display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 12, 24, 0.86);
+    padding: calc(12px + var(--st)) calc(12px + var(--sr)) calc(72px + var(--sb)) calc(12px + var(--sl));
+  }
+  #mapFull.hidden { display: none; }
+  #mapCanvas {
+    border-radius: 10px; border: 1px solid rgba(255, 201, 160, 0.45);
+    box-shadow: 0 12px 50px rgba(0, 0, 0, 0.55); background: #1a2438; touch-action: none;
+  }
+  #mapClose {
+    position: absolute; top: calc(10px + var(--st)); right: calc(10px + var(--sr));
+    width: 44px; height: 44px; border-radius: 50%; z-index: 36; cursor: pointer;
+    border: 1.5px solid rgba(255, 201, 160, 0.5); background: rgba(20, 28, 51, 0.85);
+    color: #ffd9a0; font: 600 18px/1 system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #mapLegend {
+    position: absolute; left: 50%; bottom: calc(12px + var(--sb)); transform: translateX(-50%);
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px;
+    max-width: calc(100vw - 32px);
+    font: 500 11px/1.4 system-ui, sans-serif; color: rgba(255, 240, 220, 0.85);
+  }
+  #mapLegend span { display: flex; align-items: center; gap: 5px; }
+  #mapLegend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js" } }
@@ -133,7 +197,11 @@
 <body>
 <div id="app"></div>
 <div id="loading">Loading the trail…</div>
-<div id="hint">WASD / arrows drive · 1-8 trucks · M play with friends · N sound · hold T fast-forward time</div>
+<div id="hint">WASD drive · F get out / canoe / sit · E rest · P map · 1-8 trucks · M friends · N sound · T time</div>
+<div id="mapWrap">
+  <canvas id="minimap" aria-label="Minimap — tap to open the world map"></canvas>
+  <div id="mapHint">tap map</div>
+</div>
 <div id="panel" class="hidden">
   <div id="pStatus">Not connected — solo</div>
   <div id="pCodeRow" class="hidden">
@@ -158,8 +226,20 @@
 <div id="raceHud" class="hidden"></div>
 <div id="raceToast" class="hidden"></div>
 <div id="restHint" class="hidden">E — rest until morning</div>
-<div id="fade"></div>
 <div id="touch" class="hidden"></div>
+<div id="mapFull" class="hidden" role="dialog" aria-label="World map">
+  <canvas id="mapCanvas"></canvas>
+  <button id="mapClose" aria-label="Close map">✕</button>
+  <div id="mapLegend">
+    <span><i style="background:#fff4dc"></i>You</span>
+    <span><i style="background:#f0c060"></i>Garage</span>
+    <span><i style="background:#74d8ea"></i>Canoe</span>
+    <span><i style="background:#e8915a"></i>Camp</span>
+    <span><i style="background:#f4e6cc"></i>Landmark</span>
+    <span><i style="background:#c39bf0"></i>Friend</span>
+  </div>
+</div>
+<div id="fade"></div>
 <script src="vendor/peerjs.min.js"></script>
 <script type="module" src="src/main.js"></script>
 </body>

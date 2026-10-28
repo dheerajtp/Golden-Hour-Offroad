@@ -40,7 +40,13 @@ export function buildForest(terrain, cabinSpots, rng = mulberry32(4242)) {
       if (nearCabin) continue;
       // thin out sparse regions with a position hash (keeps the seeded rng stream untouched)
       let keep = 1;
-      for (const o of regionWeights(x, z)) keep += (( REGIONS[o.name].keep ?? 1) - 1) * o.w;
+      let pineHex = PALETTE.pine;
+      let pineW = 0;
+      for (const o of regionWeights(x, z)) {
+        const R = REGIONS[o.name];
+        keep += ((R.keep ?? 1) - 1) * o.w;
+        if (R.pine && o.w > pineW) { pineW = o.w; pineHex = R.pine; }
+      }
       if ((Math.abs(Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1) > keep) continue;
       const inPine = weightOf('pine-highlands', x, z) > 0.5;
       const item = {
@@ -48,8 +54,8 @@ export function buildForest(terrain, cabinSpots, rng = mulberry32(4242)) {
         y: terrain.heightAt(x, z),
         s: 0.75 + rng() * 0.85,
         rot: rng() * Math.PI * 2,
-        autumn: rng() < 0.2 && !inPine,
-        pine: inPine ? REGIONS['pine-highlands'].pine : PALETTE.pine,
+        autumn: rng() < 0.2 && !inPine && pineW < 0.5,
+        pine: pineHex,
       };
       (item.autumn ? autumns : pines).push(item);
     }

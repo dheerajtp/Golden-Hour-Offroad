@@ -1,8 +1,5 @@
 import * as THREE from 'three';
-import { CAMERA, FOOT } from '../config.js';
-
-const SIT_PITCH = (40 * Math.PI) / 180;
-const LIE_PITCH = (65 * Math.PI) / 180;
+import { CAMERA, FOOT, BOAT } from '../config.js';
 
 function shortestAngle(from, to) {
   let d = (to - from) % (Math.PI * 2);
@@ -20,6 +17,7 @@ export class ChaseCam {
     this._desired = new THREE.Vector3();
     this._lookTarget = new THREE.Vector3();
     this.t = 0;
+    this.mode = null;
   }
 
   snap(pos, yaw) {
@@ -37,27 +35,40 @@ export class ChaseCam {
   update(dt, pos, yaw, mode = 'drive', frame = null) {
     this.t += dt;
     const fPos = 1 - Math.exp(-6 * dt);
+    const snap = this.mode !== mode;
+    this.mode = mode;
 
-    if (mode === 'sit' || mode === 'lie') {
-      const pitch = mode === 'lie' ? LIE_PITCH : SIT_PITCH;
-      const dist = mode === 'lie' ? 0.9 : 1.9;
-      const drift = mode === 'lie' ? Math.sin(this.t * 0.06) * (8 * Math.PI) / 180 : 0;
-      const cy = yaw + drift;
-      const fx = Math.sin(cy);
-      const fz = Math.cos(cy);
-      const ground = this.terrain.heightAt(pos.x - fx * dist, pos.z - fz * dist);
-      this._desired.set(
-        pos.x - fx * dist,
-        ground + (mode === 'lie' ? 0.35 : 0.65),
-        pos.z - fz * dist,
-      );
-      this.camera.position.lerp(this._desired, fPos);
+    if (mode === 'sit' || mode === 'lie' || mode === 'sleep') {
+      const eye = frame && frame.eye != null ? frame.eye : (mode === 'lie' ? 0.3 : 1.15);
+      const pitch = frame && frame.pitch != null ? frame.pitch : 0;
+      const fx = Math.sin(yaw);
+      const fz = Math.cos(yaw);
+      const water = this.terrain.waterLevelAt(pos.x, pos.z);
+      const eyeY = Math.max(pos.y + eye, water == null ? -Infinity : water + 0.15);
+      this._desired.set(pos.x, eyeY, pos.z);
+      if (snap) this.camera.position.copy(this._desired);
+      else this.camera.position.lerp(this._desired, 1 - Math.exp(-16 * dt));
+      const cp = Math.cos(pitch);
       this._lookTarget.set(
-        this._desired.x + fx * Math.cos(pitch) * 10,
+        this._desired.x + fx * cp * 10,
         this._desired.y + Math.sin(pitch) * 10,
-        this._desired.z + fz * Math.cos(pitch) * 10,
+        this._desired.z + fz * cp * 10,
       );
-      this.look.lerp(this._lookTarget, 1 - Math.exp(-5 * dt));
+      this.look.copy(this._lookTarget);
+      this.camera.lookAt(this.look);
+      return;
+    }
+
+    if (mode === 'boat') {
+      const fx = Math.sin(yaw);
+      const fz = Math.cos(yaw);
+      this._desired.set(pos.x - fx * BOAT.camBack, pos.y + BOAT.camUp, pos.z - fz * BOAT.camBack);
+      const water = this.terrain.waterLevelAt(this._desired.x, this._desired.z);
+      if (water != null && this._desired.y < water + 0.8) this._desired.y = water + 0.8;
+      if (snap) this.camera.position.copy(this._desired);
+      else this.camera.position.lerp(this._desired, fPos);
+      this._lookTarget.set(pos.x + fx * 3, pos.y + 0.9, pos.z + fz * 3);
+      this.look.lerp(this._lookTarget, 1 - Math.exp(-8 * dt));
       this.camera.lookAt(this.look);
       return;
     }

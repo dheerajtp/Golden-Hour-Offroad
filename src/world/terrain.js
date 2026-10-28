@@ -30,6 +30,16 @@ function smoothstep(e0, e1, x) {
   return t * t * (3 - 2 * t);
 }
 
+// Same falloff regions.js uses, from a distance to the region centre.
+function regionFalloff(R, d) {
+  return smoothstep(0, 1, 1 - (d - R.r) / R.blend);
+}
+
+// 1 inside the trail corridor, 0 on open ground: keeps landform carves off the trail.
+function trailGuard(mask) {
+  return 1 - smoothstep(0.03, 0.4, mask);
+}
+
 export class Terrain {
   constructor() {
     this.size = WORLD.size;
@@ -106,6 +116,10 @@ export class Terrain {
     this.#carveStream();
     this.#carveCliffGorge();
     this.#beachDunes();
+    this.#alpinePeaks();
+    this.#marshBasins();
+    this.#badlandsTerraces();
+    this.#basaltCones();
 
     const grass = new THREE.Color(PALETTE.grass);
     const dirt = new THREE.Color(PALETTE.dirt);
@@ -116,6 +130,12 @@ export class Terrain {
     const rockC = new THREE.Color(PALETTE.rock);
     const deepC = new THREE.Color(0x35485a);
     const regionGrass = Object.fromEntries(Object.entries(REGIONS).map(([k, R]) => [k, new THREE.Color(R.grass)]));
+    const regionRock = {};
+    const regionBand = {};
+    for (const [k, R] of Object.entries(REGIONS)) {
+      if (R.rock != null) regionRock[k] = new THREE.Color(R.rock);
+      if (R.bands) regionBand[k] = new THREE.Color(R.bands.color);
+    }
     const c = new THREE.Color();
     const rng = mulberry32(1337);
     const L = WATER.lake;
@@ -140,6 +160,10 @@ export class Terrain {
         && Math.cos(Math.atan2(z - L.z, x - L.x)) > 0.4) c.lerp(sand, 0.85);
       if (dl < L.r && h < L.level + 0.6) c.copy(sandDark);
       if (dp < P.r && h < P.level + 0.6) c.copy(sandDark);
+      for (const p of this.water.pools) {
+        const d = Math.hypot(x - p.x, z - p.z);
+        if (d < p.r * 1.6) c.lerp(sandDark, 0.45 * (1 - smoothstep(p.r, p.r * 1.6, d)));
+      }
       const hL = this.height[j * n + Math.max(0, i - 1)];
       const hR = this.height[j * n + Math.min(n - 1, i + 1)];
       const hU = this.height[Math.max(0, j - 1) * n + i];
@@ -153,6 +177,12 @@ export class Terrain {
           const R = REGIONS[o.name];
           c.lerp(regionGrass[o.name], o.w);
           if (R.snowFrom != null) c.lerp(snowC, smoothstep(R.snowFrom, R.snowTo, h) * o.w);
+          if (regionBand[o.name]) {
+            c.lerp(regionBand[o.name], o.w * (0.5 + 0.5 * Math.sin(h * R.bands.scale)) * 0.45);
+          }
+          if (regionRock[o.name]) {
+            c.lerp(regionRock[o.name], smoothstep(0.45, 1.0, slope) * o.w * 0.75);
+          }
         }
       }
       let sub = -1;
@@ -161,6 +191,11 @@ export class Terrain {
       for (const tp of this.water.tidepools) {
         if (Math.hypot(x - tp.x, z - tp.z) < tp.r && h < tp.level) {
           sub = Math.max(sub, Math.min(1, (tp.level - h) / 1.2));
+        }
+      }
+      for (const p of this.water.pools) {
+        if (Math.hypot(x - p.x, z - p.z) < p.r && h < p.level) {
+          sub = Math.max(sub, Math.min(1, (p.level - h) / 0.6));
         }
       }
       if (this.streamSurf[idx] < 900 && h < this.streamSurf[idx]) {
@@ -219,6 +254,7 @@ export class Terrain {
       stream: { pts: path, arc, bedKeys, width: WATER.stream.width, chute: [arc[4], sPlunge] },
       ford: { x: path[fi].x, z: path[fi].z, bed: bedFord },
       tidepools: [],
+      pools: [],
     };
   }
 
@@ -428,6 +464,121 @@ export class Terrain {
     }
   }
 
+  #alpinePeaks() {
+    const R = REGIONS['alpine-ridge'];
+    if (!R.peaks) return;
+    const { n, cell } = this;
+    const half = this.size / 2;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const idx = j * n + i;
+        const x = -half + i * cell;
+        const z = -half + j * cell;
+        const dR = Math.hypot(x - R.x, z - R.z);
+        if (dR > R.r + R.blend) continue;
+        const w = regionFalloff(R, dR) * trailGuard(this.mask[idx]);
+        if (w <= 0) continue;
+        let lift = 0;
+        for (const p of R.peaks) {
+          const d = Math.hypot(x - p.x, z - p.z);
+          if (d >= p.rad) continue;
+          lift += p.h * 0.5 * (1 + Math.cos((Math.PI * d) / p.rad));
+        }
+        if (lift) this.height[idx] += lift * w;
+      }
+    }
+  }
+
+  #marshBasins() {
+    const R = REGIONS['marsh-wetlands'];
+    if (!R.pools) return;
+    const { n, cell } = this;
+    const half = this.size / 2;
+    for (const p of R.pools) {
+      const bank = this.heightAt(p.x, p.z);
+      const level = bank - 0.22;
+      const reach = p.r * 1.6;
+      const i0 = Math.max(0, Math.floor((p.x - reach + half) / cell));
+      const i1 = Math.min(n - 1, Math.ceil((p.x + reach + half) / cell));
+      const j0 = Math.max(0, Math.floor((p.z - reach + half) / cell));
+      const j1 = Math.min(n - 1, Math.ceil((p.z + reach + half) / cell));
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
+          const x = -half + i * cell;
+          const z = -half + j * cell;
+          const d = Math.hypot(x - p.x, z - p.z);
+          if (d > reach) continue;
+          const idx = j * n + i;
+          const q = Math.min(1, d / p.r);
+          const prof = d <= p.r
+            ? level - p.depth * (1 - q * q)
+            : level + (d - p.r) * 0.55;
+          if (prof >= this.height[idx]) continue;
+          const t = smoothstep(p.r * 1.6, p.r * 0.5, d) * trailGuard(this.mask[idx]);
+          this.height[idx] += (prof - this.height[idx]) * t;
+        }
+      }
+      this.water.pools.push({ x: p.x, z: p.z, r: p.r, level, depth: p.depth });
+    }
+  }
+
+  #badlandsTerraces() {
+    const R = REGIONS.badlands;
+    const { n, cell } = this;
+    const half = this.size / 2;
+    const step = 0.9;
+    const edge = R.r + R.blend;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const idx = j * n + i;
+        const x = -half + i * cell;
+        const z = -half + j * cell;
+        const dR = Math.hypot(x - R.x, z - R.z);
+        if (dR > edge) continue;
+        const w = regionFalloff(R, dR) * trailGuard(this.mask[idx]);
+        if (w <= 0) continue;
+        const f = 1.7 * Math.sin(x * 0.045 + 1.3) * Math.cos(z * 0.05 - 0.7)
+          + 0.9 * Math.sin((x + z) * 0.09)
+          + 0.5 * Math.sin(x * 0.17 - z * 0.13);
+        const s = f / step;
+        const fl = Math.floor(s);
+        const stepped = (fl + smoothstep(0.55, 1, s - fl)) * step;
+        const uplift = 2 * (1 - Math.min(1, dR / edge));
+        this.height[idx] += ((stepped - f) * 0.8 + uplift) * w;
+      }
+    }
+  }
+
+  #basaltCones() {
+    const R = REGIONS['volcanic-basalt'];
+    if (!R.cones) return;
+    const { n, cell } = this;
+    const half = this.size / 2;
+    for (const c of R.cones) {
+      const reach = c.rad * 1.3;
+      const i0 = Math.max(0, Math.floor((c.x - reach + half) / cell));
+      const i1 = Math.min(n - 1, Math.ceil((c.x + reach + half) / cell));
+      const j0 = Math.max(0, Math.floor((c.z - reach + half) / cell));
+      const j1 = Math.min(n - 1, Math.ceil((c.z + reach + half) / cell));
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
+          const x = -half + i * cell;
+          const z = -half + j * cell;
+          const d = Math.hypot(x - c.x, z - c.z);
+          if (d >= c.rad) continue;
+          const idx = j * n + i;
+          const dR = Math.hypot(x - R.x, z - R.z);
+          if (dR > R.r + R.blend) continue;
+          const w = regionFalloff(R, dR) * trailGuard(this.mask[idx]);
+          if (w <= 0) continue;
+          let lift = c.h * Math.pow(1 - d / c.rad, 1.7);
+          if (d < c.crater) lift -= c.h * 0.5 * (1 - d / c.crater) ** 2;
+          this.height[idx] += lift * w;
+        }
+      }
+    }
+  }
+
   #rimRaise() {
     const { n, cell } = this;
     const half = this.size / 2;
@@ -469,8 +620,29 @@ export class Terrain {
     for (const p of w.tidepools) {
       if (Math.hypot(x - p.x, z - p.z) < p.r + 2) return true;
     }
+    for (const p of w.pools) {
+      if (Math.hypot(x - p.x, z - p.z) < p.r + 2) return true;
+    }
     if (this.#streamDist(x, z) < 7) return true;
     return false;
+  }
+
+  // Surface height only where the bed is actually submerged; null on dry ground.
+  waterLevelAt(x, z) {
+    const w = this.water;
+    const h = this.heightAt(x, z);
+    if (Math.hypot(x - w.lake.x, z - w.lake.z) < w.lake.r && h < w.lake.level) return w.lake.level;
+    if (Math.hypot(x - w.pond.x, z - w.pond.z) < w.pond.r && h < w.pond.level) return w.pond.level;
+    for (const p of w.tidepools) {
+      if (Math.hypot(x - p.x, z - p.z) < p.r && h < p.level) return p.level;
+    }
+    for (const p of w.pools) {
+      if (Math.hypot(x - p.x, z - p.z) < p.r && h < p.level) return p.level;
+    }
+    const { i, j } = this.#index(x, z);
+    const surf = this.streamSurf[j * this.n + i];
+    if (surf < 900 && h < surf - 0.01) return surf;
+    return null;
   }
 
   slopeAt(x, z) {

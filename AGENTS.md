@@ -34,8 +34,11 @@ src/config.js         PALETTE, WORLD, TIME, CAMERA, GARAGE, LIGHT_GAIN, HEADLIGH
                       CONFIG (quality + atmosphere flags)
 src/world/terrain.js  height grid, trail spline (Catmull-Rom loop), heightAt(), trailWeightAt(), trailPoint(u),
                       water carve passes (lake/pond/tidepools/stream+ford/cliff+gorge/rim/beach — trail carve
-                      first, gorge/cliff use nearest-sample-only drops), isWater(x,z), slopeAt(x,z), `terrain.water`
-src/world/water.js    buildWater(terrain) → discs (lake/pond/tidepool), stepped stream quads + chute box +
+                      first, gorge/cliff use nearest-sample-only drops), isWater(x,z), slopeAt(x,z), `terrain.water`.
+                      Biome landforms after #beachDunes: #alpinePeaks (cosine peaks), #marshBasins (pool basins,
+                      appended to `terrain.water.pools`), #badlandsTerraces (stepped mesa uplift), #basaltCones
+                      (cratered cones); all scaled by regionFalloff × trailGuard so trail heights are unchanged.
+src/world/water.js    buildWater(terrain) → discs (lake/pond/tidepool/marsh pools), stepped stream quads + chute box +
                       falls foam, reeds/driftwood/shells, gorge rock rows; updateWater(group, t) (foam flicker,
                       reed sway, fall pulse) — no dynamic lights
 src/world/sky.js      gradient+stars ShaderMaterial dome, keyframed sun/hemi/fog, nightFactor, follows camera;
@@ -66,9 +69,20 @@ src/world/regions.js  regionWeights/regionAt/weightOf(name,x,z) from `REGIONS` (
                       Stage F: beach-coast (95,15 r50; sand tint, forest keep .3) and misty-valley (-55,50 r55;
                       olive tint, keep .7, fog 0xe8eef2/25/170 max .85); region fog loops every REGIONS[*].fog.
                       Stage G: desert-mesa (-140,90 r45; tan tint, keep .15, fog 0xffcf9e/55/230 max .45).
+                      Stage H: alpine-ridge (255,-10 r42 blend35; grey tint + snow tint at all heights, 3 cosine
+                      peaks h10/12/8, sparseProps, keep .45, fog 0xdfeaf5/45/210 .4), marsh-wetlands (-130,-200 r52
+                      blend38; olive tint, 4 carved pools, sparseProps off, fog 0xcfd8c8/25/165 .8), badlands
+                      (150,-70 r44 blend36; orange tint + rock/band tint, stepped terraces, 10 hoodoos, sparseProps,
+                      keep .15, fog 0xf0c49a/50/220 .45), volcanic-basalt (-190,-80 r42 blend36; near-black tint,
+                      2 cratered cones, 8 dead trees, sparseProps, keep .1, fog 0x9a8a86/40/200 .5). Optional
+                      region fields: rock, bands, peaks, pools, cones, sparseProps.
 src/world/regionProps.js  async buildRegionProps(terrain): 18 Kenney nature-kit palms on the beach (primitive
                       fallback), lake-shore jetty + canoe (beach) and dock (misty) via shoreAt(angle), 48 instanced
-                      misty reeds, H4 dock dressing (rowboat + 9 string-light bulbs on end posts for both docks; bulb colour via updateRegionProps(group, nightFactor), no real lights) and a beach hammock, 16 cacti + 6 stacked terracotta-tinted rock formations in the mesa; `__game.regionProps()` (userData palms/reeds/docks)
+                      misty reeds, H4 dock dressing (rowboat + 9 string-light bulbs on end posts for both docks; bulb colour via updateRegionProps(group, nightFactor), no real lights) and a beach hammock, 16 cacti + 6 stacked terracotta-tinted rock formations in the mesa; `__game.regionProps()` (userData palms/reeds/docks).
+                      Stage H: 14 alpine boulders, 180 instanced marsh reeds + 36 lilies + 4 driftwood, 10 procedural
+                      hoodoos + 18 scrub, 16 dark basalt rocks + 8 procedural dead trees; loadModel forces Kenney
+                      metalness 0 / roughness .9 (kit GLBs declare metallicFactor 1); userData alpineRocks/marshReeds/
+                      lilies/driftwood/hoodoos/scrub/basaltRocks/deadTrees.
 src/world/structures.js  async buildStructures(terrain) (Phase 3 H1): trail-aligned, VISUAL-ONLY (no colliders; truck height is
                       still heightAt): wooden ford bridge u0.62 (deck +0.26 above the 0.22 ford water, wheels sink
                       slightly), stone gorge bridge u0.90 with piers, rock tunnel arch u0.73 (8.6 m clear). Sites in
@@ -139,8 +153,9 @@ Two dt values: `rawDt` (≤0.25s, wall-clock) drives the sky/day clock, race tim
   old vehicle model returns to its slot. Digits 1/2/3 still switch in place while driving.
   Garage contents are per-player (local display only) — friends may see a different parked car.
 - **Races**: only the **host** (or solo player) triggers zone state transitions and broadcasts `{t:'race', ...}` messages; guests mirror via `zone.applyNet`. Results identified by `actorId` (`'host'` or guest peer id).
-- **Water**: lake `(20,20,r55,level −0.9)`, pond `(−195,−255)`, stream source `(−60,270)` → ford at trail u0.62
-  (water 0.22 above trail = drivable shallow) → lake; `terrain.isWater(x,z)` (lake/pond/tidepool radius + stream <7)
+- **Water**: lake `(20,20,r55,level −0.9)`, pond `(−195,−255)`, marsh pools (4 in marsh-wetlands, level = bank − 0.22,
+  listed in `terrain.water.pools`), stream source `(−60,270)` → ford at trail u0.62
+  (water 0.22 above trail = drivable shallow) → lake; `terrain.isWater(x,z)` (lake/pond/tidepool/pool radius + stream <7)
   and `terrain.slopeAt(x,z) > 0.75` guard every scattered placement (forest/animals/props). Submerged bed vertices
   tint to `deepC 0x35485a` so translucent water still reads blue. Water = transparent Phong (opacity 0.78/0.8,
   depthWrite off, renderOrder 1) — the only geometry that renders over terrain.

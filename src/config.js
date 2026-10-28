@@ -74,6 +74,7 @@ export const REST = {
   targetPhase: 0.3,
   nightMin: 0.3,
   fadeMs: 550,
+  sleepDwellMs: 450,
 };
 
 export const RACE = {
@@ -112,6 +113,23 @@ export const CAMERA = {
   up: 3,
   near: 0.5,
   far: 1200,
+};
+
+export const BOAT = {
+  boardRadius: 8,
+  exitRadius: 6.5,
+  maxSpeed: 6,
+  reverse: 2.2,
+  accel: 3.6,
+  reverseAccel: 2.4,
+  drag: 1.1,
+  turn: 1.35,
+  minDepth: 0.35,
+  moorDepth: 0.55,
+  maxSlope: 0.5,
+  floatY: 0.05,
+  camBack: 5.4,
+  camUp: 2.1,
 };
 
 export const KEYS = [
@@ -307,6 +325,43 @@ export const REGIONS = {
     label: 'Desert Mesa', x: -140, z: 90, r: 45, blend: 40,
     grass: 0xc9a86a, keep: 0.15,
     fog: { color: 0xffcf9e, near: 55, far: 230, max: 0.45 },
+  },
+  'alpine-ridge': {
+    label: 'Alpine Ridge', x: 255, z: -10, r: 42, blend: 35,
+    grass: 0x8a928e, rock: 0x9aa0a2, snowFrom: 0, snowTo: 2.5,
+    pine: 0x3d5f4c, keep: 0.45, sparseProps: true,
+    peaks: [
+      { x: 272, z: 8, rad: 18, h: 10 },
+      { x: 285, z: -26, rad: 16, h: 12 },
+      { x: 262, z: 6, rad: 13, h: 8 },
+    ],
+    fog: { color: 0xdfeaf5, near: 45, far: 210, max: 0.4 },
+  },
+  'marsh-wetlands': {
+    label: 'Marsh Wetlands', x: -130, z: -200, r: 52, blend: 38,
+    grass: 0x6d7a4a, keep: 0.5,
+    pools: [
+      { x: -150, z: -225, r: 6.5, depth: 0.55 },
+      { x: -122, z: -236, r: 5, depth: 0.5 },
+      { x: -101, z: -228, r: 4.2, depth: 0.45 },
+      { x: -158, z: -204, r: 5.5, depth: 0.5 },
+    ],
+    fog: { color: 0xcfd8c8, near: 25, far: 165, max: 0.8 },
+  },
+  badlands: {
+    label: 'Badlands', x: 150, z: -70, r: 44, blend: 36,
+    grass: 0xc08552, rock: 0x9a5c3e, keep: 0.15, sparseProps: true,
+    bands: { color: 0x96573c, scale: 0.5 },
+    fog: { color: 0xf0c49a, near: 50, far: 220, max: 0.45 },
+  },
+  'volcanic-basalt': {
+    label: 'Basalt Flats', x: -190, z: -80, r: 42, blend: 36,
+    grass: 0x4c4a4c, rock: 0x2e2c2e, pine: 0x3a3a34, keep: 0.1, sparseProps: true,
+    cones: [
+      { x: -215, z: -55, rad: 16, h: 9, crater: 7 },
+      { x: -170, z: -105, rad: 14, h: 8, crater: 6 },
+    ],
+    fog: { color: 0x9a8a86, near: 40, far: 200, max: 0.5 },
   },
 };
 

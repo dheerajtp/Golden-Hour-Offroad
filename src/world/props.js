@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { PALETTE } from '../config.js';
+import { PALETTE, REGIONS } from '../config.js';
 import { mulberry32 } from './terrain.js';
+import { regionWeights } from './regions.js';
 
 const CABIN_US = [0.06, 0.27, 0.55, 0.78, 0.92];
 const WINDOW_DIM = new THREE.Color(0x3a2e1e);
@@ -8,6 +9,14 @@ const WINDOW_LIT = new THREE.Color(0xffd9a0);
 const FLOWER_COLORS = [0xe8c23a, 0xd94f2b, 0xe07a3a, 0xf2e8c9, 0xc2552f];
 const WOOD = 0x6b4a2e;
 const WOOD_LIGHT = 0x8a6b4a;
+
+// Harsh biomes keep their near-trail ground clear of the golden-grass bush/flower dressing.
+function bareGroundAt(x, z) {
+  for (const o of regionWeights(x, z)) {
+    if (o.w > 0.5 && REGIONS[o.name].sparseProps) return true;
+  }
+  return false;
+}
 
 function aframeCabin() {
   const group = new THREE.Group();
@@ -418,6 +427,7 @@ export function buildProps(terrain, extraAvoid = []) {
     if (Math.abs(x) > 285 || Math.abs(z) > 285) continue;
     const tw = terrain.trailWeightAt(x, z);
     if (tw < 0.04 || tw > 0.3) continue;
+    if (bareGroundAt(x, z)) continue;
     flowerPos.push({ x, z });
   }
   if (flowerPos.length) {
@@ -711,6 +721,7 @@ export function buildProps(terrain, extraAvoid = []) {
     const tw = terrain.trailWeightAt(x, z);
     if (tw < 0.06 || tw > 0.5) continue;
     if (terrain.isWater(x, z) || terrain.slopeAt(x, z) > 0.75) continue;
+    if (bareGroundAt(x, z)) continue;
     if (minDist(x, z, [...avoid, ...tents]) < 5) continue;
     bushPos.push({ x, z, fern: srng() < 0.4 });
   }

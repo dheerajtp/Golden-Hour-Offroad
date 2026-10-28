@@ -18,10 +18,12 @@ import { createTruck } from './vehicle/truck.js';
 import { Driver } from './vehicle/drive.js';
 import { ChaseCam } from './vehicle/chaseCam.js';
 import { Walker } from './vehicle/foot.js';
+import { Boat } from './vehicle/boat.js';
 import { Session } from './net/session.js';
 import { RemoteCars } from './net/remoteCars.js';
 import { initHud, updateRaceHud, toast, setHint } from './ui/hud.js';
 import { initTouch } from './ui/touchControls.js';
+import { initMap } from './ui/map.js';
 
 function vehName(id) {
   const g = GARAGE.find((e) => e.id === id);
@@ -59,9 +61,18 @@ async function boot() {
   const water = buildWater(terrain);
   scene.add(water);
   let structures = null;
+  let boat = null;
   buildStructures(terrain, sites).then((g) => { structures = g; scene.add(g); });
   let regionProps = null;
-  buildRegionProps(terrain).then((g) => { regionProps = g; scene.add(g); });
+  buildRegionProps(terrain).then((g) => {
+    regionProps = g;
+    scene.add(g);
+    const anchor = g.userData.boatAnchor;
+    if (anchor) {
+      boat = new Boat(terrain, anchor);
+      scene.add(boat.mesh);
+    }
+  });
   const smokeSources = [];
   for (const c of props.userData.cabins) {
     smokeSources.push({ x: c.x, y: terrain.heightAt(c.x, c.z) + 4.6, z: c.z });
@@ -91,6 +102,8 @@ async function boot() {
   chase.snap(driver.pos, driver.yaw);
   const walker = new Walker(terrain);
   let foot = false;
+  let aboard = false;
+  let sleeping = false;
 
   const traffic = new Traffic(terrain);
   traffic.load();
@@ -142,10 +155,35 @@ async function boot() {
   let hintText = null;
   let hintKind = null;
   let switching = false;
+  let landingCache = null;
+  let landingCheck = -1;
   const cabins = props.userData.cabins;
   const tents = props.userData.tents;
   const fadeEl = document.getElementById('fade');
   const restHintEl = document.getElementById('restHint');
+
+  const map = initMap({
+    terrain,
+    garage: garage.slots,
+    cabins,
+    tents,
+    sites,
+    getPlayer: () => {
+      if (aboard && boat) return { x: boat.pos.x, z: boat.pos.z, yaw: boat.yaw, kind: 'boat' };
+      if (foot) return { x: walker.pos.x, z: walker.pos.z, yaw: walker.yaw, kind: 'foot' };
+      return { x: driver.pos.x, z: driver.pos.z, yaw: driver.yaw, kind: 'truck' };
+    },
+    getCanoe: () => (boat ? { x: boat.pos.x, z: boat.pos.z } : null),
+    getRemotes: () => {
+      if (session.role === 'solo') return [];
+      const out = [];
+      for (const c of remotes.cars.values()) {
+        const p = c.onBoat && c.boatPos ? c.boatPos : c.onFoot && c.footPos ? c.footPos : c.pos;
+        out.push({ x: p.x, z: p.z });
+      }
+      return out;
+    },
+  });
 
   async function switchTruck(idx) {
     if (idx === garageIndex || switching) return;
@@ -221,7 +259,7 @@ async function boot() {
       session.sendVehicle(currentVehId);
       old.root.removeFromParent();
       scene.remove(walker.mesh);
-      walker.pose = 'stand';
+      walker.setPose('stand');
       foot = false;
       driver.applyTransform();
       refreshGarageModels();
@@ -262,25 +300,40 @@ async function boot() {
     return best;
   }
 
+  function beginSleep(kind, onWake) {
+    sleeping = true;
+    if (foot) {
+      walker.setPose('lie');
+      walker.lookPitch = 1.42;
+    }
+    setTimeout(() => {
+      if (!sleeping) return;
+      fadeThen(() => {
+        if (onWake) onWake();
+        toast(kind === 'tent' ? 'Camped until morning' : 'Rested until morning');
+        sleeping = false;
+      });
+    }, REST.sleepDwellMs);
+  }
+
   function performRest() {
-    if (zone.state !== 'idle') return;
+    if (zone.state !== 'idle' || sleeping) return;
     const kind = nearestRestAnchor()?.kind;
-    fadeThen(() => {
+    beginSleep(kind, () => {
       timeOfDay = REST.targetPhase;
       timeTarget = null;
       if (session.role === 'host') session.broadcast({ t: 'tm', ph: +timeOfDay.toFixed(4) });
-      toast(kind === 'tent' ? 'Camped until morning' : 'Rested until morning');
     });
   }
 
   function tryRest() {
-    if (!restAvailable) return;
+    if (!restAvailable || sleeping) return;
     if (zone.state !== 'idle') { toast('Race in progress'); return; }
     audio.click('rest');
     const kind = nearestRestAnchor()?.kind;
     if (session.role === 'guest') {
       session.sendRest();
-      fadeThen(() => toast(kind === 'tent' ? 'Camped until morning' : 'Rested until morning'));
+      beginSleep(kind, null);
     } else {
       performRest();
     }
@@ -289,6 +342,7 @@ async function boot() {
   session.on('rest', performRest);
 
   function playerPos() {
+    if (aboard && boat) return boat.pos;
     return foot ? walker.pos : driver.pos;
   }
 
@@ -309,20 +363,69 @@ async function boot() {
     return best;
   }
 
+  function exitPoint() {
+    const fx = Math.sin(driver.yaw);
+    const fz = Math.cos(driver.yaw);
+    const rx = -fz;
+    const rz = fx;
+    const spots = [
+      [rx * 1.7, rz * 1.7],
+      [-rx * 1.7, -rz * 1.7],
+      [-fx * 2.4, -fz * 2.4],
+      [fx * 2.4, fz * 2.4],
+    ];
+    for (const [dx, dz] of spots) {
+      const x = driver.pos.x + dx;
+      const z = driver.pos.z + dz;
+      if (terrain.waterLevelAt(x, z) != null) continue;
+      if (terrain.slopeAt(x, z) > 0.6) continue;
+      if (Math.abs(x) > 284 || Math.abs(z) > 284) continue;
+      return { x, z };
+    }
+    return null;
+  }
+
+  function boardBoat() {
+    if (!boat || aboard) return;
+    scene.remove(walker.mesh);
+    foot = false;
+    aboard = true;
+    boat.speed = 0;
+    sleeping = false;
+    audio.click('foot');
+    toast('Canoe — W/S row, A/D steer, F step ashore');
+  }
+
+  function disembark() {
+    if (!boat) return;
+    if (zone.state !== 'idle') { toast('Race in progress'); return; }
+    const spot = boat.findLanding();
+    if (!spot) { toast('Row closer to shore'); return; }
+    boat.speed = 0;
+    aboard = false;
+    foot = true;
+    const yaw = Math.atan2(spot.x - boat.pos.x, spot.z - boat.pos.z);
+    walker.spawn(spot.x, spot.z, yaw);
+    scene.add(walker.mesh);
+    audio.click('foot');
+  }
+
   function footAction() {
+    if (aboard) { disembark(); return; }
     if (!foot) {
-      if (Math.abs(driver.speed) > FOOT.exitMaxSpeed) return;
+      if (Math.abs(driver.speed) > FOOT.exitMaxSpeed) { toast('Slow down to get out'); return; }
       if (zone.state !== 'idle') { toast('Race in progress'); return; }
+      const spot = exitPoint();
+      if (!spot) { toast('No room to get out here'); return; }
       driver.speed = 0;
-      const rx = -Math.cos(driver.yaw);
-      const rz = Math.sin(driver.yaw);
-      walker.spawn(driver.pos.x + rx * 1.7, driver.pos.z + rz * 1.7, driver.yaw);
+      walker.spawn(spot.x, spot.z, driver.yaw);
       scene.add(walker.mesh);
       foot = true;
       audio.click('foot');
       return;
     }
     if (walker.pose === 'stand') {
+      if (boat && boat.canBoard(walker.pos) && zone.state === 'idle') { boardBoat(); return; }
       const ent = nearestEnterable();
       if (ent) {
         if (ent.kind === 'truck') {
@@ -334,11 +437,11 @@ async function boot() {
         }
         return;
       }
-      walker.pose = 'sit'; // sit anywhere
+      walker.setPose('sit'); // sit anywhere
     } else if (walker.pose === 'sit') {
-      walker.pose = 'lie';
+      walker.setPose('lie');
     } else {
-      walker.pose = 'stand';
+      walker.setPose('stand');
     }
     audio.click('foot');
   }
@@ -402,7 +505,8 @@ async function boot() {
       timeOfDay = (timeOfDay + d * (1 - Math.exp(-4 * rawDt)) + 1) % 1;
     } else {
       const still = (foot && walker.pose !== 'stand')
-        || (!foot && Math.abs(driver.speed) < FOOT.exitMaxSpeed);
+        || (aboard && boat && Math.abs(boat.speed) < 0.5)
+        || (!foot && !aboard && Math.abs(driver.speed) < FOOT.exitMaxSpeed);
       timeOfDay = (timeOfDay
         + (rawDt * timeScale * (still ? TIME.stillScale : 1)) / TIME.dayLengthSec) % 1;
     }
@@ -433,17 +537,32 @@ async function boot() {
         if (rn !== 'autumn' && !seenRegions.has(rn)) { seenRegions.add(rn); toast(REGIONS[rn].label); }
       }
     }
-    if (foot) walker.update(dt, driver.keys);
+    if (aboard && boat) boat.update(dt, driver.keys);
+    else if (foot) walker.update(dt, driver.keys);
     else driver.update(dt);
+    if (foot) walker.mesh.visible = walker.pose === 'stand';
+
     const camPos = playerPos();
-    const camYaw = foot ? walker.yaw : driver.yaw;
-    const camMode = foot ? (walker.pose === 'stand' ? 'walk' : walker.pose) : 'drive';
+    let camYaw = driver.yaw;
+    let camMode = 'drive';
     let camFrame = null;
-    if (foot && camMode === 'walk') {
-      let nd = Infinity;
-      for (const c of cabins) nd = Math.min(nd, Math.hypot(camPos.x - c.x, camPos.z - c.z));
-      for (const t of tents) nd = Math.min(nd, Math.hypot(camPos.x - t.x, camPos.z - t.z));
-      if (nd < 7) camFrame = { back: 2.1, up: 1.5 };
+    if (aboard && boat) {
+      camYaw = boat.yaw;
+      camMode = 'boat';
+    } else if (foot) {
+      camYaw = walker.yaw;
+      camMode = walker.pose === 'stand' ? 'walk' : walker.pose;
+      if (walker.pose !== 'stand') {
+        camFrame = { eye: walker.pose === 'lie' ? 0.3 : 1.15, pitch: walker.lookPitch };
+      } else {
+        let nd = Infinity;
+        for (const c of cabins) nd = Math.min(nd, Math.hypot(camPos.x - c.x, camPos.z - c.z));
+        for (const t of tents) nd = Math.min(nd, Math.hypot(camPos.x - t.x, camPos.z - t.z));
+        if (nd < 7) camFrame = { back: 2.1, up: 1.5 };
+      }
+    } else if (sleeping) {
+      camMode = 'sleep';
+      camFrame = { eye: 1.25, pitch: (82 * Math.PI) / 180 };
     }
     chase.update(dt, camPos, camYaw, camMode, camFrame);
     traffic.update(dt, sky.nightFactor);
@@ -465,7 +584,7 @@ async function boot() {
       speed: driver.speed, onFoot: foot, nearFire: nearFire(),
     });
 
-    const actors = foot
+    const actors = foot || aboard
       ? []
       : [{ pos: driver.pos, vehId: currentVehId, actorId: 'host' }];
     for (const [id, car] of remotes.cars) {
@@ -489,7 +608,7 @@ async function boot() {
     }
     updateRaceHud(zone);
 
-    const restAnchor = zone.state === 'idle' && sky.nightFactor > REST.nightMin
+    const restAnchor = !aboard && !sleeping && zone.state === 'idle' && sky.nightFactor > REST.nightMin
       ? nearestRestAnchor()
       : null;
     restAvailable = !!restAnchor;
@@ -497,7 +616,14 @@ async function boot() {
 
     let nextHint = null;
     let nextKind = null;
-    if (foot) {
+    if (aboard && boat) {
+      if (now - landingCheck > 250) {
+        landingCheck = now;
+        landingCache = boat.findLanding();
+      }
+      nextHint = landingCache ? 'F — step ashore' : 'Row closer to shore to get out';
+      nextKind = 'f';
+    } else if (foot) {
       if (walker.pose !== 'stand') {
         if (restAvailable) {
           nextHint = touch.isTouch
@@ -508,6 +634,9 @@ async function boot() {
           nextHint = 'F — stand';
           nextKind = 'f';
         }
+      } else if (boat && boat.canBoard(walker.pos) && zone.state === 'idle') {
+        nextHint = 'F — board canoe';
+        nextKind = 'f';
       } else {
         const ent = nearestEnterable();
         if (ent) {
@@ -556,6 +685,12 @@ async function boot() {
           msg.wy = +walker.pos.y.toFixed(2);
           msg.wz = +walker.pos.z.toFixed(2);
           msg.wyaw = +walker.yaw.toFixed(3);
+        } else if (aboard && boat) {
+          msg.b = 1;
+          msg.bx = +boat.pos.x.toFixed(2);
+          msg.by = +boat.pos.y.toFixed(2);
+          msg.bz = +boat.pos.z.toFixed(2);
+          msg.byaw = +boat.yaw.toFixed(3);
         }
         session.sendState(msg);
       }
@@ -566,16 +701,22 @@ async function boot() {
       if (session.role === 'host') session.broadcast({ t: 'tm', ph: +timeOfDay.toFixed(4) });
     }
 
+    map.update(now);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
-  window.addEventListener('resize', () => {
+  const onResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+    map.resize();
+  };
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', () => setTimeout(onResize, 150));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
 
   document.getElementById('loading').classList.add('hidden');
   window.__game = {
@@ -600,6 +741,10 @@ async function boot() {
       cabins: cabins.map((c) => ({ x: c.x, z: c.z, yaw: c.cabin.rotation.y })),
     }),
     onFoot: () => foot,
+    aboard: () => aboard,
+    boat: () => boat,
+    landing: () => (boat ? boat.findLanding() : null),
+    map,
     footAction,
     fires: () => props.userData.fires.map((f) => ({ x: f.x, z: f.z, y: f.y })),
     flowers: () => {

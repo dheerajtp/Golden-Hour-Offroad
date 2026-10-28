@@ -99,6 +99,9 @@ export function buildWater(terrain) {
     addDisc(tp.x, tp.level, tp.z, tp.r, 1);
     addFoam(tp.x, tp.level + 0.03, tp.z, tp.r * 0.7, 1.1);
   }
+  for (const p of w.pools) {
+    addDisc(p.x, p.level, p.z, p.r, 1);
+  }
 
   const st = w.stream;
   const keys = st.bedKeys;

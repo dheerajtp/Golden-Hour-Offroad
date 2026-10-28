@@ -1,6 +1,7 @@
 import { GARAGE } from '../config.js';
 import { createTruck } from '../vehicle/truck.js';
 import { makePerson } from '../vehicle/foot.js';
+import { createCanoeMesh } from '../vehicle/boat.js';
 
 function shortestAngle(from, to) {
   let d = (to - from) % (Math.PI * 2);
@@ -29,10 +30,13 @@ export class RemoteCars {
     this.scene.add(vehicle.root);
     const avatar = makePerson();
     avatar.visible = false;
-    this.scene.add(avatar);
+    const canoe = createCanoeMesh();
+    canoe.visible = false;
+    this.scene.add(avatar, canoe);
     this.cars.set(id, {
       vehicle,
       avatar,
+      canoe,
       pos: vehicle.root.position.clone(),
       yaw: 0,
       targetPos: null,
@@ -44,6 +48,10 @@ export class RemoteCars {
       footYaw: 0,
       footPhase: 0,
       bob: 0,
+      onBoat: false,
+      boatPos: null,
+      boatTarget: null,
+      boatYaw: 0,
     });
   }
 
@@ -58,6 +66,26 @@ export class RemoteCars {
     car.targetPos = { x: s.x, y: s.y, z: s.z };
     car.targetYaw = s.yaw;
     car.speed = s.spd;
+    if (s.b) {
+      if (!car.boatPos) car.boatPos = { x: s.bx, y: s.by, z: s.bz };
+      car.boatTarget = { x: s.bx, y: s.by, z: s.bz };
+      car.boatYaw = s.byaw;
+      car.onBoat = true;
+      car.onFoot = false;
+      car.footTarget = null;
+      car.avatar.visible = false;
+      car.canoe.visible = true;
+      if (!car.canoe.userData.placed) {
+        car.canoe.position.set(s.bx, s.by, s.bz);
+        car.canoe.rotation.y = s.byaw;
+        car.canoe.userData.placed = true;
+      }
+      return;
+    }
+    if (car.onBoat) {
+      car.onBoat = false;
+      car.canoe.visible = false;
+    }
     if (s.f) {
       if (!car.footPos) car.footPos = { x: s.wx, y: s.wy, z: s.wz };
       car.onFoot = true;
@@ -89,6 +117,13 @@ export class RemoteCars {
         car.vehicle.root.rotation.y = car.yaw;
         car.vehicle.spinWheels(dt, car.speed);
       }
+      if (car.onBoat && car.boatPos && car.boatTarget) {
+        car.boatPos.x += (car.boatTarget.x - car.boatPos.x) * k;
+        car.boatPos.y += (car.boatTarget.y - car.boatPos.y) * k;
+        car.boatPos.z += (car.boatTarget.z - car.boatPos.z) * k;
+        car.canoe.position.copy(car.boatPos);
+        car.canoe.rotation.y += shortestAngle(car.canoe.rotation.y, car.boatYaw) * ky;
+      }
       if (car.onFoot && car.footPos && car.footTarget) {
         const before = { x: car.footPos.x, z: car.footPos.z };
         car.footPos.x += (car.footTarget.x - car.footPos.x) * k;
@@ -115,6 +150,7 @@ export class RemoteCars {
     if (!car) return;
     car.vehicle.root.removeFromParent();
     car.avatar.removeFromParent();
+    car.canoe.removeFromParent();
     this.cars.delete(id);
   }
 
